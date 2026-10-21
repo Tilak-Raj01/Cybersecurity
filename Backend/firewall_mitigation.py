@@ -4,29 +4,49 @@ The implementation is intentionally lightweight so it can be exercised in
 unit tests without requiring a real iptables installation.
 """
 
+import ipaddress
+import shlex
 import subprocess
 
 
-class ActiveMitigationEngine:  # pylint: disable=too-few-public-methods
+class ActiveMitigationEngine:
     """Track and apply IP blocking actions for the firewall."""
 
-    def __init__(self, dry_run=True):
+    def __init__(self, dry_run: bool = True):
         self.dry_run = dry_run
         self.blocked_ips = set()
 
+    @staticmethod
+    def _normalize_ip(ip_address: str) -> str:
+        """Return a canonical IP string or raise ValueError for invalid input."""
+        if not isinstance(ip_address, str):
+            raise ValueError("ip_address must be a string")
+
+        value = ip_address.strip()
+        ipaddress.ip_address(value)
+        return value
+
     def block_ip(self, ip_address: str) -> bool:
         """Block an IP address and record it as blocked."""
-        if ip_address in self.blocked_ips:
+        try:
+            normalized_ip = self._normalize_ip(ip_address)
+        except ValueError:
+            return False
+
+        if normalized_ip in self.blocked_ips:
             return True
 
-        cmd = f"sudo iptables -A INPUT -s {ip_address} -j DROP"
-        if self.dry_run:
-            print(f"[DRY-RUN] Executed command: {cmd}")
-        else:
-            subprocess.run(cmd, shell=True, check=True)
+        cmd = ["sudo", "iptables", "-A", "INPUT", "-s", normalized_ip, "-j", "DROP"]
+        command_string = " ".join(shlex.quote(part) for part in cmd)
 
-        self.blocked_ips.add(ip_address)
+        if self.dry_run:
+            print(f"[DRY-RUN] Executed command: {command_string}")
+        else:
+            subprocess.run(cmd, check=True)
+
+        self.blocked_ips.add(normalized_ip)
         return True
+
 
 if __name__ == '__main__':
     mitigator = ActiveMitigationEngine(dry_run=True)
