@@ -2,6 +2,7 @@
 
 import unittest
 from Backend.firewall_mitigation import ActiveMitigationEngine
+from Backend.signature_engine import SignatureDetectionEngine
 
 class TestMitigation(unittest.TestCase):
     """Tests for IP blocking and mitigation state tracking."""
@@ -28,6 +29,26 @@ class TestMitigation(unittest.TestCase):
         blocked = engine.block_signature_ips(matches)
         self.assertEqual(blocked, ips)
         self.assertTrue(all(ip in engine.blocked_ips for ip in ips))
+
+    def test_auto_block_at_least_ten_signature_matched_sources(self):
+        """Batch inspection should automatically block ten matching source IPs."""
+        mitigator = ActiveMitigationEngine(dry_run=True)
+        signatures = SignatureDetectionEngine()
+        packets = [
+            {
+                "protocol": "tcp",
+                "src_port": 23,
+                "src_ip": f"192.0.2.{index}",
+                "dst_ip": "198.51.100.20",
+            }
+            for index in range(1, 11)
+        ]
+
+        blocked = mitigator.auto_block_packets(packets, signatures)
+
+        self.assertEqual(len(blocked), 10)
+        self.assertEqual(mitigator.blocked_ips, {packet["src_ip"] for packet in packets})
+        self.assertNotIn("198.51.100.20", mitigator.blocked_ips)
 
 if __name__ == '__main__':
     unittest.main()
