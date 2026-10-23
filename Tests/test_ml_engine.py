@@ -4,8 +4,15 @@ These tests skip cleanly when the `ml_anomaly_engine` package is not
 installed in the current environment to avoid import-time failures.
 """
 
+import os
+import sys
 import unittest
 import numpy as np
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+BACKEND_DIR = os.path.join(PROJECT_ROOT, 'Backend')
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
 try:
     from ml_anomaly_engine import AnomalyDetector
@@ -29,6 +36,7 @@ class TestMLEngine(unittest.TestCase):
         self.assertIn('is_anomaly', res)
         self.assertIn('anomaly_score', res)
 
+    @unittest.skipIf(_ML_ENGINE_MISSING, f"ml_anomaly_engine missing: {_ML_ENGINE_MISSING}")
     def test_training_from_dataframe(self):
         """A prepared dataset frame should be usable for model training."""
         detector = AnomalyDetector()

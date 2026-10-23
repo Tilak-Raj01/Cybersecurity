@@ -29,6 +29,7 @@ def export_to_onnx(output_path="iot_nids_edge.onnx"):
         model,
         dummy_input,
         output_path,
+        verbose=False,
         input_names=['features'],
         output_names=['output'],
     )

@@ -5,7 +5,14 @@ to keep developer setups and CI robust against missing optional
 components.
 """
 
+import os
+import sys
 import unittest
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+BACKEND_DIR = os.path.join(PROJECT_ROOT, 'Backend')
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
 try:
     from hybrid_pipeline import HybridNIDSPipeline
