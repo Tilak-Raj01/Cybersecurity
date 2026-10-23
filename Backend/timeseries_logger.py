@@ -7,17 +7,6 @@ class IncidentLogger:
         self.conn = sqlite3.connect(db_path)
         self.create_table()
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def close(self):
-        if self.conn:
-            self.conn.close()
-            self.conn = None
-
     def create_table(self):
         query = """
         CREATE TABLE IF NOT EXISTS security_events (
@@ -32,23 +21,16 @@ class IncidentLogger:
         self.conn.execute(query)
         self.conn.commit()
 
-    @staticmethod
-    def _validate_text(value, field_name):
-        if value is None or not isinstance(value, str):
-            raise TypeError(f"{field_name} must be a string")
-        cleaned = value.strip()
-        if not cleaned:
-            raise ValueError(f"{field_name} must not be empty")
-        return cleaned
-
     def log_event(self, rule_id, severity, src_ip, message):
-        rule_id = self._validate_text(rule_id, "rule_id")
-        severity = self._validate_text(severity, "severity")
-        src_ip = self._validate_text(src_ip, "src_ip")
-        message = self._validate_text(message, "message")
-
-        query = "INSERT INTO security_events (timestamp, rule_id, severity, src_ip, message) VALUES (?, ?, ?, ?, ?)"
-        self.conn.execute(query, (time.time(), rule_id, severity, src_ip, message))
+        query = """
+            INSERT INTO security_events
+                (timestamp, rule_id, severity, src_ip, message)
+            VALUES (?, ?, ?, ?, ?)
+        """
+        self.conn.execute(
+            query,
+            (time.time(), rule_id, severity, src_ip, message),
+        )
         self.conn.commit()
 
     def fetch_recent(self, limit=10):
@@ -58,5 +40,33 @@ class IncidentLogger:
             raise ValueError("limit must be non-negative")
 
         cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM security_events ORDER BY timestamp DESC LIMIT ?", (limit,))
+        cursor.execute(
+            "SELECT * FROM security_events ORDER BY timestamp DESC LIMIT ?",
+            (limit,),
+        )
         return cursor.fetchall()
+
+
+def display_events_table(events):
+    """Formats and prints the list of security event tuples as a clean CLI table."""
+    if not events:
+        print("No events found in database.")
+        return
+
+    headers = ["ID", "Timestamp", "Rule ID", "Severity", "Source IP", "Message"]
+    col_widths = [5, 20, 15, 10, 16, 45]
+
+    def format_row(row):
+        values = list(row)
+        if len(values) > 1 and isinstance(values[1], (int, float)):
+            values[1] = time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(values[1])
+            )
+        return " | ".join(
+            f"{str(value):<{width}}" for value, width in zip(values, col_widths)
+        )
+
+    print(format_row(headers))
+    print("-+-".join("-" * width for width in col_widths))
+    for event in events:
+        print(format_row(event))
